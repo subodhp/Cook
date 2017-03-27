@@ -104,15 +104,15 @@ class CookTest(unittest.TestCase):
         self.assertTrue('retries_remaining' in job)
         instance = job['instances'][0]
         self.assertTrue(isinstance(instance['start_time'], int))
-        self.assertTrue(isinstance(instance['executor_id'], unicode))
-        self.assertTrue(isinstance(instance['hostname'], unicode))
-        self.assertTrue(isinstance(instance['slave_id'], unicode))
+        self.assertTrue(isinstance(instance['executor_id'], str))
+        self.assertTrue(isinstance(instance['hostname'], str))
+        self.assertTrue(isinstance(instance['slave_id'], str))
         self.assertTrue(isinstance(instance['preempted'], bool))
         self.assertTrue(isinstance(instance['end_time'], int))
         self.assertTrue(isinstance(instance['backfilled'], bool))
         self.assertTrue('ports' in instance)
         self.assertEquals('completed', job['status'])
-        self.assertTrue(isinstance(instance['task_id'], unicode))
+        self.assertTrue(isinstance(instance['task_id'], str))
 
     def test_cancel_job(self):
         job_spec = self.minimal_job(command='sleep 300')
