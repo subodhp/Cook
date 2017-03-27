@@ -20,7 +20,7 @@ class CookTest(unittest.TestCase):
         job = {
             'max_retries': 1,
             'mem': 10,
-            'cpus': 1,
+            'cpus': 0.1,
             'uuid': str(uuid.uuid4()),
             'command': 'echo hello',
             'name': 'echo',
@@ -85,3 +85,22 @@ class CookTest(unittest.TestCase):
             '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
         self.assertEqual('failed', job['state'])
 
+    def test_change_retries(self):
+        job_spec = self.minimal_job(command='sleep 10')
+        resp = self.session.post('%s/rawscheduler' % self.cook_url,
+                                 json={'jobs': [job_spec]})
+        self.wait_for_job(job_spec['uuid'], 'running')
+        resp = self.session.delete(
+            '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid']))
+        self.assertEqual(204, resp.status_code)
+        job = self.session.get(
+            '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
+        self.assertEqual('failed', job['state'])
+        resp = self.session.put('%s/retry' % self.cook_url, json={'retries': 2, 'job': job_spec['uuid']})
+        self.assertEqual(201, resp.status_code)
+        job = self.session.get(
+            '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
+        self.assertEqual('waiting', job['status'])
+        # TODO(pschorf): Flaky due to restriction against scheduling jobs on the same host
+        # job = self.wait_for_job(job_spec['uuid'], 'completed')
+        # self.assertEqual('success', job['state'])
