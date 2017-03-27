@@ -20,7 +20,7 @@ class CookTest(unittest.TestCase):
         job = {
             'max_retries': 1,
             'mem': 10,
-            'cpus': 1,
+            'cpus': 0.1,
             'uuid': str(uuid.uuid4()),
             'command': 'echo hello',
             'name': 'echo',
@@ -28,6 +28,11 @@ class CookTest(unittest.TestCase):
         }
         job.update(kwargs)
         return job
+
+    def minimal_group(self, **kwargs):
+        group = {"uuid" : str(uuid.uuid4())}
+        group.update(kwargs)
+        return group
 
     def setUp(self):
         self.cook_url = 'http://localhost:12321'
@@ -105,15 +110,15 @@ class CookTest(unittest.TestCase):
         self.assertTrue('retries_remaining' in job)
         instance = job['instances'][0]
         self.assertTrue(isinstance(instance['start_time'], int))
-        self.assertTrue(isinstance(instance['executor_id'], unicode))
-        self.assertTrue(isinstance(instance['hostname'], unicode))
-        self.assertTrue(isinstance(instance['slave_id'], unicode))
+        self.assertTrue(isinstance(instance['executor_id'], str))
+        self.assertTrue(isinstance(instance['hostname'], str))
+        self.assertTrue(isinstance(instance['slave_id'], str))
         self.assertTrue(isinstance(instance['preempted'], bool))
         self.assertTrue(isinstance(instance['end_time'], int))
         self.assertTrue(isinstance(instance['backfilled'], bool))
         self.assertTrue('ports' in instance)
         self.assertEquals('completed', job['status'])
-        self.assertTrue(isinstance(instance['task_id'], unicode))
+        self.assertTrue(isinstance(instance['task_id'], str))
 
 
     # TODO This method should schedule a job on Cook to determine
@@ -207,3 +212,76 @@ class CookTest(unittest.TestCase):
         job = self.session.get(
             '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
         self.assertEqual('failed', job['state'])
+
+    def test_change_retries(self):
+        job_spec = self.minimal_job(command='sleep 10')
+        resp = self.session.post('%s/rawscheduler' % self.cook_url,
+                                 json={'jobs': [job_spec]})
+        self.wait_for_job(job_spec['uuid'], 'running')
+        resp = self.session.delete(
+            '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid']))
+        self.assertEqual(204, resp.status_code)
+        job = self.session.get(
+            '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
+        self.assertEqual('failed', job['state'])
+        resp = self.session.put('%s/retry' % self.cook_url, json={'retries': 2, 'job': job_spec['uuid']})
+        self.assertEqual(201, resp.status_code)
+        job = self.session.get(
+            '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
+        self.assertEqual('waiting', job['status'])
+        job = self.wait_for_job(job_spec['uuid'], 'completed')
+        self.assertEqual('success', job['state'])
+
+    def test_cancel_instance(self):
+        job_spec = self.minimal_job(command='sleep 10', max_retries=2)
+        resp = self.session.post('%s/rawscheduler' % self.cook_url,
+                                 json={'jobs': [job_spec]})
+        job = self.wait_for_job(job_spec['uuid'], 'running')
+        task_id = job['instances'][0]['task_id']
+        resp = self.session.delete(
+            '%s/rawscheduler?instance=%s' % (self.cook_url, task_id))
+        self.assertEqual(204, resp.status_code)
+        job = self.wait_for_job(job_spec['uuid'], 'completed')
+        self.assertEqual('success', job['state'])
+
+    def test_explicit_group(self):
+        group_spec = self.minimal_group()
+        job_a = self.minimal_job(group=group_spec["uuid"])
+        job_b = self.minimal_job(group=group_spec["uuid"])
+        data = {'jobs':[job_a, job_b], 'groups':[group_spec]}
+        resp = self.session.post('%s/rawscheduler' % self.cook_url, json=data)
+        self.assertEqual(resp.status_code, 201)
+        jobs = self.session.get('%s/rawscheduler?job=%s&job=%s' % 
+                                (self.cook_url, job_a['uuid'], job_b['uuid']))
+        self.assertEqual(200, jobs.status_code)
+        jobs = jobs.json()
+        self.assertEqual(group_spec['uuid'], jobs[0]['groups'][0])
+        self.assertEqual(group_spec['uuid'], jobs[1]['groups'][0])
+        self.wait_for_job(job_a['uuid'], 'completed')
+        self.wait_for_job(job_b['uuid'], 'completed')
+
+    def test_straggler_handling(self):
+        straggler_handling = {
+                'type' : 'quantile-deviation',
+                'parameters' : {
+                    'quantile' : 0.5,
+                    'multiplier' : 2.0
+                    }
+                }
+        group_spec = self.minimal_group(straggler_handling=straggler_handling)
+        job_fast = self.minimal_job(group=group_spec["uuid"])
+        job_slow = self.minimal_job(group=group_spec["uuid"], command='sleep 120')
+        data = {'jobs':[job_fast, job_slow], 'groups':[group_spec]}
+        resp = self.session.post('%s/rawscheduler' % self.cook_url, json=data)
+        self.assertEqual(resp.status_code, 201)
+        self.wait_for_job(job_fast['uuid'], 'completed')
+        self.wait_for_job(job_slow['uuid'], 'completed')
+        jobs = self.session.get('%s/rawscheduler?job=%s&job=%s' % 
+                                (self.cook_url, job_fast['uuid'], job_slow['uuid']))
+        self.assertEqual(200, jobs.status_code)
+        jobs = jobs.json()
+        self.assertEqual('success', jobs[0]['state'])
+        self.assertEqual('failed', jobs[1]['state'])
+        self.assertEqual(2004, jobs[1]['instances'][0]['reason_code'])
+        print(jobs)
+
