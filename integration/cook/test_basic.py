@@ -76,3 +76,10 @@ class CookTest(unittest.TestCase):
         self.assertEquals(1, len(job['instances']))
         self.assertEquals('failed', job['instances'][0]['status'])
 
+    def test_query_job_correct_keys_in_response(self):
+        job_uuid = uuid.uuid4()
+        request_body = {'jobs': [ self.minimal_job(job_uuid) ]}
+        resp = self.session.post('%s/rawscheduler' % self.cook_url, json=request_body)
+        self.assertEqual(resp.status_code, 201)
+        job = self.wait_for_job(job_uuid, 'completed')[0]
+        self.assertTrue('labels' in job)
