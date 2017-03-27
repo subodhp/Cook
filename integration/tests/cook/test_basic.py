@@ -86,7 +86,8 @@ class CookTest(unittest.TestCase):
         self.assertEquals(job_spec['uuid'], job['uuid'])
         self.assertEquals(job_spec['cpus'], job['cpus'])
         self.assertTrue('labels' in job)
-        self.assertEquals(9223372036854775807, job['max_runtime']) # this is MAX_LONG max, the default value
+        self.assertEquals(9223372036854775807, job['max_runtime'])
+        # 9223372036854775807 is MAX_LONG(ish), the default value for max_runtime
         self.assertEquals('success', job['state'])
         self.assertTrue('env' in job)
         self.assertTrue('framework_id' in job)
