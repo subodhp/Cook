@@ -7,7 +7,7 @@ import uuid
 
 class CookTest(unittest.TestCase):
 
-    @retry(stop_max_delay=120000, wait_fixed=5000)
+    @retry(stop_max_delay=120000, wait_fixed=1000)
     def wait_for_job(self, job_id, status):
         job = self.session.get('%s/rawscheduler?job=%s' % (self.cook_url, job_id))
         self.assertEqual(200, job.status_code)
@@ -49,3 +49,30 @@ class CookTest(unittest.TestCase):
         job = self.wait_for_job(job_uuid, 'completed')
         self.assertEquals(1, len(job['instances']))
         self.assertEquals('failed', job['instances'][0]['status'])
+
+    # def test_failing_submit_with_retries(self):
+    #     job_uuid = uuid.uuid4()
+    #     print job_uuid
+    #     jobspec = self.minimal_job(job_uuid)
+    #     jobspec['command'] = 'exit 1'
+    #     jobspec['max_retries'] = 3
+    #     resp = self.session.post('%s/rawscheduler' % self.cook_url,
+    #                              json={'jobs': [jobspec]})
+    #     self.assertEquals(201, resp.status_code)
+    #     job = self.wait_for_job(job_uuid, 'completed')
+    #     self.assertEquals(3, len(job['instances']))
+    #     for instance in job['instances']:
+    #         self.assertEquals('failed', instance['status'])
+
+    def test_max_runtime_exceeded(self):
+        job_uuid = uuid.uuid4()
+        jobspec = self.minimal_job(job_uuid)
+        jobspec['command'] = 'sleep 60'
+        jobspec['max_runtime'] = 5000
+        resp = self.session.post('%s/rawscheduler' % self.cook_url,
+                                 json={'jobs': [jobspec]})
+        self.assertEquals(201, resp.status_code)
+        job = self.wait_for_job(job_uuid, 'completed')
+        self.assertEquals(1, len(job['instances']))
+        self.assertEquals('failed', job['instances'][0]['status'])
+
