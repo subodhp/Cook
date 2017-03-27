@@ -1,3 +1,4 @@
+import json
 import requests
 from retrying import retry
 import time
@@ -13,8 +14,11 @@ class CookTest(unittest.TestCase):
         job = job.json()
         self.assertEqual(status, job[0]['status'])
 
-    def test_basic_submit(self):
+    def setUp(self):
         self.cook_url = 'http://localhost:12321'
+
+
+    def test_basic_submit(self):
         job_uuid = uuid.uuid4()
         request_body = {'jobs': [ {
             'max_retries': 1,
