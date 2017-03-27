@@ -38,17 +38,17 @@ class CookTest(unittest.TestCase):
         resp = self.session.post('%s/rawscheduler' % self.cook_url, json=request_body)
         self.assertEqual(resp.status_code, 201)
         job = self.wait_for_job(job_uuid, 'completed')
-        self.assertEquals('success', job['instances'][0]['status'])
+        self.assertEqual('success', job['instances'][0]['status'])
 
     def test_failing_submit(self):
         job_uuid = str(uuid.uuid4())
         jobspec = self.minimal_job(uuid=job_uuid, command='exit 1')
         resp = self.session.post('%s/rawscheduler' % self.cook_url,
                                  json={'jobs': [jobspec]})
-        self.assertEquals(201, resp.status_code)
+        self.assertEqual(201, resp.status_code)
         job = self.wait_for_job(job_uuid, 'completed')
-        self.assertEquals(1, len(job['instances']))
-        self.assertEquals('failed', job['instances'][0]['status'])
+        self.assertEqual(1, len(job['instances']))
+        self.assertEqual('failed', job['instances'][0]['status'])
 
     # def test_failing_submit_with_retries(self):
     #     job_uuid = str(uuid.uuid4())
@@ -58,19 +58,19 @@ class CookTest(unittest.TestCase):
     #     jobspec['max_retries'] = 3
     #     resp = self.session.post('%s/rawscheduler' % self.cook_url,
     #                              json={'jobs': [jobspec]})
-    #     self.assertEquals(201, resp.status_code)
+    #     self.assertEqual(201, resp.status_code)
     #     job = self.wait_for_job(job_uuid, 'completed')
-    #     self.assertEquals(3, len(job['instances']))
+    #     self.assertEqual(3, len(job['instances']))
     #     for instance in job['instances']:
-    #         self.assertEquals('failed', instance['status'])
+    #         self.assertEqual('failed', instance['status'])
 
     def test_max_runtime_exceeded(self):
         job_uuid = str(uuid.uuid4())
         jobspec = self.minimal_job(uuid=job_uuid, command='sleep 60', max_runtime=5000)
         resp = self.session.post('%s/rawscheduler' % self.cook_url,
                                  json={'jobs': [jobspec]})
-        self.assertEquals(201, resp.status_code)
+        self.assertEqual(201, resp.status_code)
         job = self.wait_for_job(job_uuid, 'completed')
-        self.assertEquals(1, len(job['instances']))
-        self.assertEquals('failed', job['instances'][0]['status'])
+        self.assertEqual(1, len(job['instances']))
+        self.assertEqual('failed', job['instances'][0]['status'])
 
