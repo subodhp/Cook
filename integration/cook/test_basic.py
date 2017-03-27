@@ -18,7 +18,6 @@ class CookTest(unittest.TestCase):
         self.cook_url = 'http://localhost:12321'
         self.session = requests.Session()
 
-
     def test_basic_submit(self):
         job_uuid = uuid.uuid4()
         request_body = {'jobs': [ {
