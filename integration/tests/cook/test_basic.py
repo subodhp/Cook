@@ -78,6 +78,10 @@ class CookTest(unittest.TestCase):
         self.assertEqual(1, len(job['instances']))
         self.assertEqual('failed', job['instances'][0]['status'])
 
+    # load a job by UUID using GET /rawscheduler
+    def get_job(self, uuid):
+        return self.session.get('%s/rawscheduler?job=%s' % (self.cook_url, uuid)).json()[0]
+
     def test_get_job(self):
         # schedule a job
         job_spec = self.minimal_job() 
@@ -87,8 +91,6 @@ class CookTest(unittest.TestCase):
         self.assertEqual(201, resp.status_code)
 
         # query for the same job & ensure the response has what it's supposed to have
-        resp = self.session.get('%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid']))
-        self.assertEqual(200, resp.status_code)
         job = self.wait_for_job(job_spec['uuid'], 'completed')
         self.assertEquals(job_spec['mem'], job['mem'])
         self.assertEquals(job_spec['max_retries'], job['max_retries'])
@@ -120,11 +122,12 @@ class CookTest(unittest.TestCase):
         self.assertEquals('completed', job['status'])
         self.assertTrue('task_id' in instance)
 
-    # TODO This method should schedule a job on Cook to determine
-    # what Cook thinks the current user is.  The user is used as
-    # a query parameter when listing jobs, for example.
     def determine_user(self):
-        return "vagrant"
+        job_spec = self.minimal_job()
+        request_body = {'jobs': [ job_spec ]}
+        resp = self.session.post('%s/rawscheduler' % self.cook_url, json=request_body)
+        self.assertEqual(resp.status_code, 201)
+        return self.get_job(job_spec['uuid'])['user']
 
     def test_list_jobs_by_state(self):
         # schedule a bunch of jobs in hopes of getting jobs into different statuses
@@ -143,10 +146,6 @@ class CookTest(unittest.TestCase):
             for job in jobs:
                 #print "%s %s" % (job['uuid'], job['status'])
                 self.assertEquals(state, job['status'])
-
-    # load a job by UUID using GET /rawscheduler
-    def get_job(self, uuid):
-        return self.session.get('%s/rawscheduler?job=%s' % (self.cook_url, uuid)).json()[0]
 
     def test_list_jobs_by_time(self):
         # schedule two jobs with different submit times
