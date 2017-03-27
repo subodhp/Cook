@@ -19,7 +19,7 @@ class CookTest(unittest.TestCase):
     def minimal_job(self, **kwargs):
         job = {
             'max_retries': 1,
-            'mem': 100,
+            'mem': 10,
             'cpus': 1,
             'uuid': str(uuid.uuid4()),
             'command': 'echo hello',
@@ -72,4 +72,16 @@ class CookTest(unittest.TestCase):
         job = self.wait_for_job(job_spec['uuid'], 'completed')
         self.assertEqual(1, len(job['instances']))
         self.assertEqual('failed', job['instances'][0]['status'])
+
+    def test_cancel_job(self):
+        job_spec = self.minimal_job(command='sleep 300')
+        resp = self.session.post('%s/rawscheduler' % self.cook_url,
+                                 json={'jobs': [job_spec]})
+        self.wait_for_job(job_spec['uuid'], 'running')
+        resp = self.session.delete(
+            '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid']))
+        self.assertEqual(204, resp.status_code)
+        job = self.session.get(
+            '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
+        self.assertEqual('failed', job['state'])
 
