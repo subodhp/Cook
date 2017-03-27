@@ -137,6 +137,17 @@ class CookTest(unittest.TestCase):
         job = self.session.get(
             '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
         self.assertEqual('waiting', job['status'])
-        # TODO(pschorf): Flaky due to restriction against scheduling jobs on the same host
-        # job = self.wait_for_job(job_spec['uuid'], 'completed')
-        # self.assertEqual('success', job['state'])
+        job = self.wait_for_job(job_spec['uuid'], 'completed')
+        self.assertEqual('success', job['state'])
+
+    def test_cancel_instance(self):
+        job_spec = self.minimal_job(command='sleep 10', max_retries=2)
+        resp = self.session.post('%s/rawscheduler' % self.cook_url,
+                                 json={'jobs': [job_spec]})
+        job = self.wait_for_job(job_spec['uuid'], 'running')
+        task_id = job['instances'][0]['task_id']
+        resp = self.session.delete(
+            '%s/rawscheduler?instance=%s' % (self.cook_url, task_id))
+        self.assertEqual(204, resp.status_code)
+        job = self.wait_for_job(job_spec['uuid'], 'completed')
+        self.assertEqual('success', job['state'])
