@@ -6,6 +6,7 @@ import unittest
 import uuid
 
 class CookTest(unittest.TestCase):
+    _multiprocess_can_split_ = True
 
     @retry(stop_max_delay=120000, wait_fixed=1000)
     def wait_for_job(self, job_id, status):
