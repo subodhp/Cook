@@ -223,8 +223,8 @@ class CookTest(unittest.TestCase):
         job = self.session.get(
             '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
         self.assertEqual('failed', job['state'])
-        resp = self.session.put('%s/retry' % self.cook_url, json={'retries': 2, 'job': job_spec['uuid']})
-        self.assertEqual(201, resp.status_code)
+        resp = self.session.put('%s/retry' % self.cook_url, json={'retries': 2, 'jobs': [job_spec['uuid']]})
+        self.assertEqual(201, resp.status_code, resp.text)
         job = self.session.get(
             '%s/rawscheduler?job=%s' % (self.cook_url, job_spec['uuid'])).json()[0]
         self.assertEqual('waiting', job['status'])
@@ -242,6 +242,23 @@ class CookTest(unittest.TestCase):
         self.assertEqual(204, resp.status_code)
         job = self.wait_for_job(job_spec['uuid'], 'completed')
         self.assertEqual('success', job['state'])
+
+    def test_implicit_group(self):
+        group_uuid = str(uuid.uuid4())
+        job_a = self.minimal_job(group=group_uuid)
+        job_b = self.minimal_job(group=group_uuid)
+        data = {'jobs':[job_a, job_b]}
+        resp = self.session.post('%s/rawscheduler' % self.cook_url, json=data)
+        self.assertEqual(resp.status_code, 201)
+        jobs = self.session.get('%s/rawscheduler?job=%s&job=%s' % 
+                                (self.cook_url, job_a['uuid'], job_b['uuid']))
+        self.assertEqual(200, jobs.status_code)
+        jobs = jobs.json()
+        self.assertEqual(group_uuid, jobs[0]['groups'][0])
+        self.assertEqual(group_uuid, jobs[1]['groups'][0])
+        self.wait_for_job(job_a['uuid'], 'completed')
+        self.wait_for_job(job_b['uuid'], 'completed')
+
 
     def test_explicit_group(self):
         group_spec = self.minimal_group()
