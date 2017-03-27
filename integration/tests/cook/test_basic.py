@@ -73,6 +73,42 @@ class CookTest(unittest.TestCase):
         self.assertEqual(1, len(job['instances']))
         self.assertEqual('failed', job['instances'][0]['status'])
 
+    def test_query_job_correct_keys_in_response(self):
+        job_spec = self.minimal_job() 
+        request_body = {'jobs': [job_spec]}
+        resp = self.session.post('%s/rawscheduler' % self.cook_url, json=request_body)
+        self.assertEqual(resp.status_code, 201)
+        job = self.wait_for_job(job_spec['uuid'], 'completed')
+        self.assertEquals(job_spec['mem'], job['mem'])
+        self.assertEquals(job_spec['max_retries'], job['max_retries'])
+        self.assertEquals(job_spec['name'], job['name'])
+        self.assertEquals(job_spec['priority'], job['priority'])
+        self.assertEquals(job_spec['uuid'], job['uuid'])
+        self.assertEquals(job_spec['cpus'], job['cpus'])
+        self.assertTrue('labels' in job)
+        self.assertEquals(9223372036854775807, job['max_runtime'])
+        # 9223372036854775807 is MAX_LONG(ish), the default value for max_runtime
+        self.assertEquals('success', job['state'])
+        self.assertTrue('env' in job)
+        self.assertTrue('framework_id' in job)
+        self.assertTrue('ports' in job)
+        self.assertTrue('instances' in job)
+        self.assertEquals('completed', job['status'])
+        self.assertTrue(isinstance(job['submit_time'], int))
+        self.assertTrue('uris' in job)
+        self.assertTrue('retries_remaining' in job)
+        instance = job['instances'][0]
+        self.assertTrue(isinstance(instance['start_time'], int))
+        self.assertTrue(isinstance(instance['executor_id'], unicode))
+        self.assertTrue(isinstance(instance['hostname'], unicode))
+        self.assertTrue(isinstance(instance['slave_id'], unicode))
+        self.assertTrue(isinstance(instance['preempted'], bool))
+        self.assertTrue(isinstance(instance['end_time'], int))
+        self.assertTrue(isinstance(instance['backfilled'], bool))
+        self.assertTrue('ports' in instance)
+        self.assertEquals('completed', job['status'])
+        self.assertTrue(isinstance(instance['task_id'], unicode))
+
     def test_cancel_job(self):
         job_spec = self.minimal_job(command='sleep 300')
         resp = self.session.post('%s/rawscheduler' % self.cook_url,
