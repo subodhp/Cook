@@ -172,3 +172,29 @@ class CookTest(unittest.TestCase):
         self.assertEqual(group_spec['uuid'], jobs[1]['groups'][0])
         self.wait_for_job(job_a['uuid'], 'completed')
         self.wait_for_job(job_b['uuid'], 'completed')
+
+    def test_straggler_handling(self):
+        straggler_handling = {
+                'type' : 'quantile-deviation',
+                'parameters' : {
+                    'quantile' : 0.5,
+                    'multiplier' : 2.0
+                    }
+                }
+        group_spec = self.minimal_group(straggler_handling=straggler_handling)
+        job_fast = self.minimal_job(group=group_spec["uuid"])
+        job_slow = self.minimal_job(group=group_spec["uuid"], command='sleep 120')
+        data = {'jobs':[job_fast, job_slow], 'groups':[group_spec]}
+        resp = self.session.post('%s/rawscheduler' % self.cook_url, json=data)
+        self.assertEqual(resp.status_code, 201)
+        self.wait_for_job(job_fast['uuid'], 'completed')
+        self.wait_for_job(job_slow['uuid'], 'completed')
+        jobs = self.session.get('%s/rawscheduler?job=%s&job=%s' % 
+                                (self.cook_url, job_fast['uuid'], job_slow['uuid']))
+        self.assertEqual(200, jobs.status_code)
+        jobs = jobs.json()
+        self.assertEqual('success', jobs[0]['state'])
+        self.assertEqual('failed', jobs[1]['state'])
+        self.assertEqual(2004, jobs[1]['instances'][0]['reason_code'])
+        print(jobs)
+
