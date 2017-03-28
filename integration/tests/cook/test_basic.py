@@ -77,6 +77,7 @@ class CookTest(unittest.TestCase):
         job = self.wait_for_job(job_spec['uuid'], 'completed')
         self.assertEqual(1, len(job['instances']))
         self.assertEqual('failed', job['instances'][0]['status'])
+        self.assertEqual(2003, job['instances'][0]['reason_code'])
 
     def test_get_job(self):
         # schedule a job
