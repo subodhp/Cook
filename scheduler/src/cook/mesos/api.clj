@@ -175,7 +175,11 @@
    (s/optional-key :reason_code) s/Int
    (s/optional-key :output_url) s/Str
    (s/optional-key :cancelled) s/Bool
-   (s/optional-key :reason_string) s/Str})
+   (s/optional-key :reason_string) s/Str
+   (s/optional-key :exit_code) s/Int
+   (s/optional-key :progress) s/Int
+   (s/optional-key :progress_message) s/Str
+   (s/optional-key :sandbox) s/Str})
 
 (defn max-128-characters-and-alphanum?
   "Returns true if s contains only '.', '_', '-' or
@@ -764,7 +768,11 @@
                               mesos-start (:instance/mesos-start-time instance)
                               end (:instance/end-time instance)
                               cancelled (:instance/cancelled instance)
-                              reason (reason/instance-entity->reason-entity db instance)]
+                              reason (reason/instance-entity->reason-entity db instance)
+                              exit-code (:instance/exit-code instance)
+                              progress (:instance/progress instance)
+                              progress-message (:instance/progress-message instance)
+                              sandbox (:instance/sandbox instance)]
                           (cond-> {:task_id (:instance/task-id instance)
                                    :hostname hostname
                                    :ports (:instance/ports instance)
@@ -779,7 +787,11 @@
                                   end (assoc :end_time (.getTime end))
                                   cancelled (assoc :cancelled cancelled)
                                   reason (assoc :reason_code (:reason/code reason)
-                                                :reason_string (:reason/string reason)))))
+                                                :reason_string (:reason/string reason))
+                                  exit-code (assoc :exit_code exit-code)
+                                  progress (assoc :progress progress)
+                                  progress-message (assoc :progress_message progress-message)
+                                  sandbox (assoc :sandbox sandbox))))
                       (:job/instance job))}]
     (cond-> job-map
             groups (assoc :groups (map #(str (:group/uuid %)) groups))

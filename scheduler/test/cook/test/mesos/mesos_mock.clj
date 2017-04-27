@@ -313,11 +313,14 @@
   (let [tasks [{:task-id {:value "45cb7812-1233-4546-888d-67cc13eac398"}
                 :slave-id {:value "a5cb3212-3023-4546-888d-67cc13eac3dd"}
                 :name "to-launch"
-                :command {:value "10000"
-                          :environment {:variables [{:name "EXECUTION_TIME"
-                                                     :value "10000"}]}
-                          :user "user-A"
-                          :uris []}
+                :executor {:executor-id {:value "executor-id"}
+                           :framework-id {:value "framework-id"}
+                           :name "dummy-executor"
+                           :command {:value "10000"
+                                     :environment {:variables [{:name "EXECUTION_TIME"
+                                                                :value "10000"}]}
+                                     :user "user-A"
+                                     :uris []}}
                 :resources [{:name "cpus" :role "*" :scalar 8 :type :value-scalar}
                             {:name "mem" :role "*" :scalar 80000 :type :value-scalar}
                             {:name "ports" :role "*" :ranges [{:begin 12001 :end 25000}] :type :value-ranges}]
@@ -490,10 +493,13 @@
     {:task-id {:value task-id}
      :slave-id {:value slave-id}
      :name name
-     :command {:value command-str
-               :environment env
-               :user user
-               :uris uris}
+     :executor {:executor-id {:value "executor-id"}
+                :framework-id {:value "framework-id"}
+                :name "dummy-executor"
+                :command {:value command-str
+                          :environment env
+                          :user user
+                          :uris uris}}
      :resources resources
      :labels labels
      :data data}))
@@ -657,8 +663,8 @@
   ([]
    (setup-test-curator-framework 2282))
   ([zk-port]
-   ;; Copied from src/cook/components
-   ;; TODO: don't copy from components
+    ;; Copied from src/cook/components
+    ;; TODO: don't copy from components
    (let [retry-policy (BoundedExponentialBackoffRetry. 100 120000 10)
          ;; The 180s session and 30s connection timeouts were pulled from a google group
          ;; recommendation
@@ -678,7 +684,7 @@
 (defmacro with-cook-scheduler
   [conn make-mesos-driver-fn
    {:keys [get-mesos-utilization mesos-datomic-mult zk-prefix offer-incubate-time-ms
-           mea-culpa-failure-limit task-constraints riemann-host riemann-port
+           mea-culpa-failure-limit task-constraints executor riemann-host riemann-port
            mesos-pending-jobs-atom offer-cache gpu-enabled? rebalancer-config fenzo-config]
     :or {get-mesos-utilization (fn [] 0.9) ; can get this from mesos mock later
          zk-prefix "/cook"
@@ -689,6 +695,16 @@
                            :memory-gb 48
                            :cpus 6
                            :retry-limit 5}
+         executor {:command "cook-executor"
+                   :log-level "INFO"
+                   :max-message-length 512
+                   :progress-output-name "stdout"
+                   :progress-regex-string "regex-string"
+                   :progress-sample-interval-ms 1000
+                   :uri {:cache true
+                         :executable true
+                         :extract false
+                         :value "file:///path/to/cook/executor"}}
          riemann-host nil
          riemann-port nil
          gpu-enabled? false
@@ -719,7 +735,7 @@
                                                  curator-framework# ~conn
                                                  mesos-mult# ~zk-prefix
                                                  ~offer-incubate-time-ms ~mea-culpa-failure-limit
-                                                 ~task-constraints ~riemann-host ~riemann-port
+                                                 ~task-constraints ~executor ~riemann-host ~riemann-port
                                                  pending-jobs-atom# offer-cache#
                                                  ~gpu-enabled? ~rebalancer-config ~fenzo-config
                                                  trigger-chans#)]
